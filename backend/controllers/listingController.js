@@ -110,4 +110,82 @@ async function getListingById(req, res) {
     res.status(500).json({ success: false, error: err.message });
   }
 }
-module.exports = { createListing, getListings, getListingById };
+
+async function updateListing(req, res) {
+  try {
+    const { id } = req.params;
+
+    const listingResult = await pool.query("SELECT * FROM listings WHERE id = $1", [id]);
+
+    if (listingResult.rows.length === 0) {
+      return res.status(404).json({ success: false, error: "Listing not found." });
+    }
+
+    const listing = listingResult.rows[0];
+
+    if (listing.landlord_id !== req.user.id) {
+      return res.status(403).json({ success: false, error: "You can only edit your own listings." });
+    }
+
+    const {
+      title,
+      description,
+      price_per_month,
+      room_type,
+      bedrooms,
+      has_kitchen,
+      bathroom_type,
+      has_water,
+      has_electricity,
+      is_gated,
+      district,
+      status,
+    } = req.body;
+
+    const result = await pool.query(
+      `UPDATE listings SET
+        title = COALESCE($1, title),
+        description = COALESCE($2, description),
+        price_per_month = COALESCE($3, price_per_month),
+        room_type = COALESCE($4, room_type),
+        bedrooms = COALESCE($5, bedrooms),
+        has_kitchen = COALESCE($6, has_kitchen),
+        bathroom_type = COALESCE($7, bathroom_type),
+        has_water = COALESCE($8, has_water),
+        has_electricity = COALESCE($9, has_electricity),
+        is_gated = COALESCE($10, is_gated),
+        district = COALESCE($11, district),
+        status = COALESCE($12, status)
+       WHERE id = $13
+       RETURNING *`,
+      [title, description, price_per_month, room_type, bedrooms, has_kitchen, bathroom_type, has_water, has_electricity, is_gated, district, status, id]
+    );
+
+    res.json({ success: true, listing: result.rows[0] });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+}
+
+async function deleteListing(req, res) {
+  try {
+    const { id } = req.params;
+
+    const listingResult = await pool.query("SELECT * FROM listings WHERE id = $1", [id]);
+
+    if (listingResult.rows.length === 0) {
+      return res.status(404).json({ success: false, error: "Listing not found." });
+    }
+
+    if (listingResult.rows[0].landlord_id !== req.user.id) {
+      return res.status(403).json({ success: false, error: "You can only delete your own listings." });
+    }
+
+    await pool.query("DELETE FROM listings WHERE id = $1", [id]);
+
+    res.json({ success: true, message: "Listing deleted." });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+}
+module.exports = { createListing, getListings, getListingById, updateListing, deleteListing };
