@@ -69,4 +69,21 @@ async function loginUser(req, res) {
   }
 }
 
-module.exports = { registerUser, loginUser };
+
+async function getProfile(req, res) {
+  try {
+    const result = await pool.query(
+      "SELECT id, full_name, email, phone, role, is_verified, created_at FROM users WHERE id = $1",
+      [req.user.id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, error: "User not found." });
+    }
+
+    res.json({ success: true, user: result.rows[0] });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+}
+module.exports = { registerUser, loginUser, getProfile };
