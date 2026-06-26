@@ -1,0 +1,10 @@
+-- MESSAGES TABLE
+CREATE TABLE messages (
+    id SERIAL PRIMARY KEY,
+    listing_id INTEGER REFERENCES listings(id) ON DELETE CASCADE,
+    sender_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    receiver_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    message_text TEXT NOT NULL,
+    is_read BOOLEAN DEFAULT FALSE,
+    sent_at TIMESTAMP DEFAULT NOW()
+);
