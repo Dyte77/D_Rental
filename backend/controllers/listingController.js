@@ -1,4 +1,5 @@
 const pool = require("../db");
+const cloudinary = require("../config/cloudinary");
 
 async function createListing(req, res) {
   try {
@@ -98,14 +99,21 @@ async function getListingById(req, res) {
       return res.status(404).json({ success: false, error: "Listing not found." });
     }
 
-    // Log the view — viewer_id is null if no one is logged in
+    const imagesResult = await pool.query(
+      "SELECT id, image_url, uploaded_at FROM listing_images WHERE listing_id = $1 AND is_approved = TRUE ORDER BY uploaded_at ASC",
+      [id]
+    );
+
     const viewerId = req.user ? req.user.id : null;
     await pool.query(
       "INSERT INTO listing_views (listing_id, viewer_id) VALUES ($1, $2)",
       [id, viewerId]
     );
 
-    res.json({ success: true, listing: listingResult.rows[0] });
+    res.json({
+      success: true,
+      listing: { ...listingResult.rows[0], images: imagesResult.rows },
+    });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
@@ -205,4 +213,69 @@ async function adminDeleteListing(req, res) {
   }
 }
 
-module.exports = { createListing, getListings, getListingById, updateListing, deleteListing, adminDeleteListing };
+async function uploadListingImage(req, res) {
+  try {
+    const { id } = req.params;
+
+    const listingResult = await pool.query("SELECT * FROM listings WHERE id = $1", [id]);
+
+    if (listingResult.rows.length === 0) {
+      return res.status(404).json({ success: false, error: "Listing not found." });
+    }
+
+    if (listingResult.rows[0].landlord_id !== req.user.id) {
+      return res.status(403).json({ success: false, error: "You can only upload images to your own listings." });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({ success: false, error: "No image file provided." });
+    }
+
+    const base64Image = `data:${req.file.mimetype};base64,${req.file.buffer.toString("base64")}`;
+
+    const uploadResult = await cloudinary.uploader.upload(base64Image, {
+      folder: "rental_connect_listings",
+    });
+
+    const result = await pool.query(
+      "INSERT INTO listing_images (listing_id, image_url) VALUES ($1, $2) RETURNING *",
+      [id, uploadResult.secure_url]
+    );
+
+    res.status(201).json({ success: true, image: result.rows[0] });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+}
+
+async function deleteListingImage(req, res) {
+  try {
+    const { imageId } = req.params;
+
+    const imageResult = await pool.query(
+      `SELECT listing_images.*, listings.landlord_id
+       FROM listing_images
+       JOIN listings ON listing_images.listing_id = listings.id
+       WHERE listing_images.id = $1`,
+      [imageId]
+    );
+
+    if (imageResult.rows.length === 0) {
+      return res.status(404).json({ success: false, error: "Image not found." });
+    }
+
+    const image = imageResult.rows[0];
+
+    if (image.landlord_id !== req.user.id && req.user.role !== "admin") {
+      return res.status(403).json({ success: false, error: "You can only delete images from your own listings." });
+    }
+
+    await pool.query("DELETE FROM listing_images WHERE id = $1", [imageId]);
+
+    res.json({ success: true, message: "Image deleted." });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+}
+
+module.exports = { createListing, getListings, getListingById, updateListing, deleteListing, adminDeleteListing, uploadListingImage, deleteListingImage };
