@@ -162,4 +162,86 @@ async function verifyOtp(req, res) {
   }
 }
 
-module.exports = { registerUser, loginUser, getProfile, requestOtp, verifyOtp };
+async function requestPasswordReset(req, res) {
+  try {
+    const { identifier } = req.body; // can be email or phone
+
+    if (!identifier) {
+      return res.status(400).json({ success: false, error: "Email or phone number is required." });
+    }
+
+    const userResult = await pool.query(
+      "SELECT * FROM users WHERE email = $1 OR phone = $1",
+      [identifier]
+    );
+
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ success: false, error: "No account found with that email or phone number." });
+    }
+
+    const user = userResult.rows[0];
+    const resetCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+    await pool.query(
+      "UPDATE users SET otp_code = $1, otp_expires_at = $2 WHERE id = $3",
+      [resetCode, expiresAt, user.id]
+    );
+
+    const isEmail = identifier.includes("@");
+
+    if (isEmail) {
+      // MOCK EMAIL SEND — replace with a real email provider later
+      console.log(`[MOCK EMAIL] Password reset code for ${identifier} is: ${resetCode}`);
+    } else {
+      // MOCK SMS SEND — replace with a real SMS gateway later
+      console.log(`[MOCK SMS] Password reset code for ${identifier} is: ${resetCode}`);
+    }
+
+    res.json({ success: true, message: `Reset code sent via ${isEmail ? "email" : "SMS"}.` });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+}
+
+async function resetPassword(req, res) {
+  try {
+    const { identifier, reset_code, new_password } = req.body;
+
+    if (!identifier || !reset_code || !new_password) {
+      return res.status(400).json({ success: false, error: "Identifier, reset code, and new password are required." });
+    }
+
+    const userResult = await pool.query(
+      "SELECT * FROM users WHERE email = $1 OR phone = $1",
+      [identifier]
+    );
+
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ success: false, error: "No account found." });
+    }
+
+    const user = userResult.rows[0];
+
+    if (user.otp_code !== reset_code) {
+      return res.status(400).json({ success: false, error: "Incorrect reset code." });
+    }
+
+    if (new Date() > new Date(user.otp_expires_at)) {
+      return res.status(400).json({ success: false, error: "Reset code has expired." });
+    }
+
+    const newPasswordHash = await bcrypt.hash(new_password, 10);
+
+    await pool.query(
+      "UPDATE users SET password_hash = $1, otp_code = NULL, otp_expires_at = NULL WHERE id = $2",
+      [newPasswordHash, user.id]
+    );
+
+    res.json({ success: true, message: "Password reset successfully." });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+}
+
+module.exports = { registerUser, loginUser, getProfile, requestOtp, verifyOtp , requestPasswordReset, resetPassword };
