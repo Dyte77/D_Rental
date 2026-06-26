@@ -6,9 +6,13 @@ async function registerUser(req, res) {
   try {
     const { full_name, email, phone, password, role } = req.body;
 
-    if (!full_name || !email || !phone || !password || !role) {
-      return res.status(400).json({ success: false, error: "All fields are required." });
-    }
+   if (!full_name || !email || !phone || !password || !role) {
+  return res.status(400).json({ success: false, error: "All fields are required." });
+}
+
+if (!["tenant", "landlord"].includes(role)) {
+  return res.status(400).json({ success: false, error: "Role must be either 'tenant' or 'landlord'." });
+}
 
     const passwordHash = await bcrypt.hash(password, 10);
 
@@ -46,6 +50,11 @@ async function loginUser(req, res) {
     if (!passwordMatches) {
       return res.status(401).json({ success: false, error: "Invalid email or password." });
     }
+
+    if (user.is_suspended) {
+       return res.status(403).json({ success: false, error: "Your account has been suspended. Contact support." });
+    }
+
 
     const token = jwt.sign(
       { id: user.id, role: user.role },

@@ -1,6 +1,7 @@
 const jwt = require("jsonwebtoken");
+const pool = require("../db");
 
-function verifyToken(req, res, next) {
+async function verifyToken(req, res, next) {
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
@@ -11,6 +12,17 @@ function verifyToken(req, res, next) {
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    const result = await pool.query("SELECT is_suspended FROM users WHERE id = $1", [decoded.id]);
+
+    if (result.rows.length === 0) {
+      return res.status(401).json({ success: false, error: "User no longer exists." });
+    }
+
+    if (result.rows[0].is_suspended) {
+      return res.status(403).json({ success: false, error: "Your account has been suspended." });
+    }
+
     req.user = decoded;
     next();
   } catch (err) {
