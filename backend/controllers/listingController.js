@@ -51,4 +51,40 @@ async function createListing(req, res) {
   }
 }
 
-module.exports = { createListing };
+async function getListings(req, res) {
+  try {
+    const { district, min_price, max_price, room_type } = req.query;
+
+    let query = "SELECT * FROM listings WHERE status = 'available'";
+    const values = [];
+
+    if (district) {
+      values.push(district);
+      query += ` AND district ILIKE $${values.length}`;
+    }
+
+    if (min_price) {
+      values.push(min_price);
+      query += ` AND price_per_month >= $${values.length}`;
+    }
+
+    if (max_price) {
+      values.push(max_price);
+      query += ` AND price_per_month <= $${values.length}`;
+    }
+
+    if (room_type) {
+      values.push(room_type);
+      query += ` AND room_type = $${values.length}`;
+    }
+
+    query += " ORDER BY created_at DESC";
+
+    const result = await pool.query(query, values);
+
+    res.json({ success: true, count: result.rows.length, listings: result.rows });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+}
+module.exports = { createListing, getListings };
