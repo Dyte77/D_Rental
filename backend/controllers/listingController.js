@@ -188,4 +188,21 @@ async function deleteListing(req, res) {
     res.status(500).json({ success: false, error: err.message });
   }
 }
-module.exports = { createListing, getListings, getListingById, updateListing, deleteListing };
+
+async function adminDeleteListing(req, res) {
+  try {
+    const { id } = req.params;
+
+    const result = await pool.query("DELETE FROM listings WHERE id = $1 RETURNING *", [id]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, error: "Listing not found." });
+    }
+
+    res.json({ success: true, message: "Listing removed by admin.", listing: result.rows[0] });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+}
+
+module.exports = { createListing, getListings, getListingById, updateListing, deleteListing, adminDeleteListing };

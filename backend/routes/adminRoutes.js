@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const { getAllUsers, createAdmin, suspendUser, unsuspendUser, deleteUser } = require("../controllers/adminController");
+const { adminDeleteListing } = require("../controllers/listingController");
 const { verifyToken } = require("../middleware/authMiddleware");
 
 function requireAdmin(req, res, next) {
@@ -17,5 +18,6 @@ router.post("/users", createAdmin);
 router.patch("/users/:id/suspend", suspendUser);
 router.patch("/users/:id/unsuspend", unsuspendUser);
 router.delete("/users/:id", deleteUser);
+router.delete("/listings/:id", adminDeleteListing);
 
 module.exports = router;
