@@ -110,9 +110,26 @@ async function getListingById(req, res) {
       [id, viewerId]
     );
 
+    const listing = listingResult.rows[0];
+
+    if (!req.user) {
+      // Logged-out tenant: show only price and images, hide everything else
+      return res.json({
+        success: true,
+        listing: {
+          id: listing.id,
+          price_per_month: listing.price_per_month,
+          status: listing.status,
+          images: imagesResult.rows,
+          locked: true,
+          message: "Log in or sign up to view full listing details, location, and contact the landlord.",
+        },
+      });
+    }
+
     res.json({
       success: true,
-      listing: { ...listingResult.rows[0], images: imagesResult.rows },
+      listing: { ...listing, images: imagesResult.rows, locked: false },
     });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
