@@ -1,0 +1,7 @@
+-- LISTING VIEWS TABLE
+CREATE TABLE listing_views (
+    id SERIAL PRIMARY KEY,
+    listing_id INTEGER REFERENCES listings(id) ON DELETE CASCADE,
+    viewer_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    viewed_at TIMESTAMP DEFAULT NOW()
+);

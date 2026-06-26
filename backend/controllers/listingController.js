@@ -87,4 +87,27 @@ async function getListings(req, res) {
     res.status(500).json({ success: false, error: err.message });
   }
 }
-module.exports = { createListing, getListings };
+
+async function getListingById(req, res) {
+  try {
+    const { id } = req.params;
+
+    const listingResult = await pool.query("SELECT * FROM listings WHERE id = $1", [id]);
+
+    if (listingResult.rows.length === 0) {
+      return res.status(404).json({ success: false, error: "Listing not found." });
+    }
+
+    // Log the view — viewer_id is null if no one is logged in
+    const viewerId = req.user ? req.user.id : null;
+    await pool.query(
+      "INSERT INTO listing_views (listing_id, viewer_id) VALUES ($1, $2)",
+      [id, viewerId]
+    );
+
+    res.json({ success: true, listing: listingResult.rows[0] });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+}
+module.exports = { createListing, getListings, getListingById };

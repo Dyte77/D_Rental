@@ -18,4 +18,19 @@ function verifyToken(req, res, next) {
   }
 }
 
-module.exports = verifyToken;
+function optionalAuth(req, res, next) {
+  const authHeader = req.headers.authorization;
+
+  if (authHeader && authHeader.startsWith("Bearer ")) {
+    const token = authHeader.split(" ")[1];
+    try {
+      req.user = jwt.verify(token, process.env.JWT_SECRET);
+    } catch (err) {
+      // Invalid token on an optional route — just proceed without a user, don't block
+    }
+  }
+
+  next();
+}
+
+module.exports = { verifyToken, optionalAuth };
