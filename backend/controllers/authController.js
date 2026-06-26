@@ -73,7 +73,7 @@ async function loginUser(req, res) {
 async function getProfile(req, res) {
   try {
     const result = await pool.query(
-      "SELECT id, full_name, email, phone, role, is_verified, created_at FROM users WHERE id = $1",
+     "SELECT id, full_name, email, phone, role, is_verified, created_at FROM users WHERE id = $1",
       [req.user.id]
     );
 
@@ -86,4 +86,71 @@ async function getProfile(req, res) {
     res.status(500).json({ success: false, error: err.message });
   }
 }
-module.exports = { registerUser, loginUser, getProfile };
+
+async function requestOtp(req, res) {
+  try {
+    const { phone } = req.body;
+
+    if (!phone) {
+      return res.status(400).json({ success: false, error: "Phone number is required." });
+    }
+
+    const userResult = await pool.query("SELECT * FROM users WHERE phone = $1", [phone]);
+
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ success: false, error: "No account found with that phone number." });
+    }
+
+    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes from now
+
+    await pool.query(
+      "UPDATE users SET otp_code = $1, otp_expires_at = $2 WHERE phone = $3",
+      [otpCode, expiresAt, phone]
+    );
+
+    // MOCK SMS SEND — replace this with a real SMS gateway later
+    console.log(`[MOCK SMS] OTP for ${phone} is: ${otpCode}`);
+
+    res.json({ success: true, message: "OTP sent." });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+}
+
+async function verifyOtp(req, res) {
+  try {
+    const { phone, otp_code } = req.body;
+
+    if (!phone || !otp_code) {
+      return res.status(400).json({ success: false, error: "Phone and OTP code are required." });
+    }
+
+    const userResult = await pool.query("SELECT * FROM users WHERE phone = $1", [phone]);
+
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ success: false, error: "No account found with that phone number." });
+    }
+
+    const user = userResult.rows[0];
+
+    if (user.otp_code !== otp_code) {
+      return res.status(400).json({ success: false, error: "Incorrect OTP code." });
+    }
+
+    if (new Date() > new Date(user.otp_expires_at)) {
+      return res.status(400).json({ success: false, error: "OTP code has expired." });
+    }
+
+    await pool.query(
+      "UPDATE users SET is_verified = TRUE, otp_code = NULL, otp_expires_at = NULL WHERE phone = $1",
+      [phone]
+    );
+
+    res.json({ success: true, message: "Phone number verified successfully." });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+}
+
+module.exports = { registerUser, loginUser, getProfile, requestOtp, verifyOtp };
