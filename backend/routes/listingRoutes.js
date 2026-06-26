@@ -17,7 +17,7 @@ router.get("/", getListings);
 router.get("/:id", optionalAuth, getListingById);
 router.put("/:id", verifyToken, updateListing);
 router.delete("/:id", verifyToken, deleteListing);
-router.post("/:id/images", verifyToken, upload.single("image"), uploadListingImage);
+router.post("/:id/images", verifyToken, upload.array("images", 5), uploadListingImage);
 router.delete("/images/:imageId", verifyToken, deleteListingImage);
 
 module.exports = router;

@@ -227,27 +227,45 @@ async function uploadListingImage(req, res) {
       return res.status(403).json({ success: false, error: "You can only upload images to your own listings." });
     }
 
-    if (!req.file) {
-      return res.status(400).json({ success: false, error: "No image file provided." });
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({ success: false, error: "No image files provided." });
     }
 
-    const base64Image = `data:${req.file.mimetype};base64,${req.file.buffer.toString("base64")}`;
-
-    const uploadResult = await cloudinary.uploader.upload(base64Image, {
-      folder: "rental_connect_listings",
-    });
-
-    const result = await pool.query(
-      "INSERT INTO listing_images (listing_id, image_url) VALUES ($1, $2) RETURNING *",
-      [id, uploadResult.secure_url]
+    const existingCountResult = await pool.query(
+      "SELECT COUNT(*) FROM listing_images WHERE listing_id = $1",
+      [id]
     );
+    const existingCount = parseInt(existingCountResult.rows[0].count);
 
-    res.status(201).json({ success: true, image: result.rows[0] });
+    if (existingCount + req.files.length > 5) {
+      return res.status(400).json({
+        success: false,
+        error: `This listing already has ${existingCount} image(s). Maximum 5 images per listing.`,
+      });
+    }
+
+    const uploadedImages = [];
+
+    for (const file of req.files) {
+      const base64Image = `data:${file.mimetype};base64,${file.buffer.toString("base64")}`;
+
+      const uploadResult = await cloudinary.uploader.upload(base64Image, {
+        folder: "rental_connect_listings",
+      });
+
+      const insertResult = await pool.query(
+        "INSERT INTO listing_images (listing_id, image_url) VALUES ($1, $2) RETURNING *",
+        [id, uploadResult.secure_url]
+      );
+
+      uploadedImages.push(insertResult.rows[0]);
+    }
+
+    res.status(201).json({ success: true, images: uploadedImages });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
 }
-
 async function deleteListingImage(req, res) {
   try {
     const { imageId } = req.params;
