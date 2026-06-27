@@ -45,7 +45,7 @@ jobs:
         env:
           PGPASSWORD: postgres
         run: |
-          psql -h localhost -U postgres -d d_rental_test -f db/schema.sql
+          psql -h localhost -U postgres -d d_rental_test -f db/001_create_users_and_listings.sql
           psql -h localhost -U postgres -d d_rental_test -f db/002_create_listing_views.sql
           psql -h localhost -U postgres -d d_rental_test -f db/003_create_messages.sql
           psql -h localhost -U postgres -d d_rental_test -f db/004_add_otp_to_users.sql
