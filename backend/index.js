@@ -1,39 +1,6 @@
-const express = require("express");
-const cors = require("cors");
-const pool = require("./db");
-const authRoutes = require("./routes/authRoutes");
-const listingRoutes = require("./routes/listingRoutes");
-const messageRoutes = require("./routes/messageRoutes");
-const reportRoutes = require("./routes/reportRoutes");
-const adminRoutes = require("./routes/adminRoutes");
-const { generalLimiter } = require("./middleware/rateLimiter");
+const app = require("./app");
 
-const app = express();
 const PORT = 3000;
-
-app.use(cors());
-app.use(express.json());
-app.use(generalLimiter);
-app.use("/api/auth", authRoutes);
-app.use("/api/listings", listingRoutes);
-app.use("/api/messages", messageRoutes);
-app.use("/api/reports", reportRoutes);
-app.use("/api/admin", adminRoutes);
-
-app.get("/", (req, res) => {
-  res.send("Rental Connect backend is running.");
-});
-
-// 404 handler — for any route that doesn't exist at all
-app.use((req, res) => {
-  res.status(404).json({ success: false, error: "Route not found." });
-});
-
-// Global error handler — catches anything that slips past individual try/catch blocks
-app.use((err, req, res, next) => {
-  console.error("Unhandled error:", err);
-  res.status(500).json({ success: false, error: "Something went wrong. Please try again later." });
-});
 
 app.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);
