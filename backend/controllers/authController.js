@@ -6,14 +6,6 @@ async function registerUser(req, res) {
   try {
     const { full_name, email, phone, password, role } = req.body;
 
-   if (!full_name || !email || !phone || !password || !role) {
-  return res.status(400).json({ success: false, error: "All fields are required." });
-}
-
-if (!["tenant", "landlord"].includes(role)) {
-  return res.status(400).json({ success: false, error: "Role must be either 'tenant' or 'landlord'." });
-}
-
     const passwordHash = await bcrypt.hash(password, 10);
 
     const result = await pool.query(
@@ -25,6 +17,14 @@ if (!["tenant", "landlord"].includes(role)) {
 
     res.status(201).json({ success: true, user: result.rows[0] });
   } catch (err) {
+    if (err.code === "23505") {
+      if (err.constraint === "users_email_key") {
+        return res.status(409).json({ success: false, error: "An account with that email already exists." });
+      }
+      if (err.constraint === "users_phone_key") {
+        return res.status(409).json({ success: false, error: "An account with that phone number already exists." });
+      }
+    }
     res.status(500).json({ success: false, error: err.message });
   }
 }
