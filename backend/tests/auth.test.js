@@ -65,4 +65,40 @@ describe("Auth endpoints", () => {
     expect(res.statusCode).toBe(401);
     expect(res.body.success).toBe(false);
   });
+
+  test("rejects account deletion with wrong password", async () => {
+  const loginRes = await request(app).post("/api/auth/login").send({
+    email: testUser.email,
+    password: testUser.password,
+  });
+  const token = loginRes.body.token;
+
+  const res = await request(app)
+    .delete("/api/auth/account")
+    .set("Authorization", `Bearer ${token}`)
+    .send({ password: "wrongpassword" });
+
+  expect(res.statusCode).toBe(401);
+});
+
+test("deletes own account with correct password, and token becomes invalid afterward", async () => {
+  const loginRes = await request(app).post("/api/auth/login").send({
+    email: testUser.email,
+    password: testUser.password,
+  });
+  const token = loginRes.body.token;
+
+  const deleteRes = await request(app)
+    .delete("/api/auth/account")
+    .set("Authorization", `Bearer ${token}`)
+    .send({ password: testUser.password });
+
+  expect(deleteRes.statusCode).toBe(200);
+
+  const profileRes = await request(app)
+    .get("/api/auth/profile")
+    .set("Authorization", `Bearer ${token}`);
+
+  expect(profileRes.statusCode).toBe(401);
+});
 });

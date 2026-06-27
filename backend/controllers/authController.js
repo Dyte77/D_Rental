@@ -244,4 +244,34 @@ async function resetPassword(req, res) {
   }
 }
 
-module.exports = { registerUser, loginUser, getProfile, requestOtp, verifyOtp , requestPasswordReset, resetPassword };
+async function deleteOwnAccount(req, res) {
+  try {
+    const { password } = req.body;
+
+    if (!password) {
+      return res.status(400).json({ success: false, error: "Password is required to confirm account deletion." });
+    }
+
+    const userResult = await pool.query("SELECT * FROM users WHERE id = $1", [req.user.id]);
+
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ success: false, error: "User not found." });
+    }
+
+    const user = userResult.rows[0];
+
+    const passwordMatches = await bcrypt.compare(password, user.password_hash);
+
+    if (!passwordMatches) {
+      return res.status(401).json({ success: false, error: "Incorrect password." });
+    }
+
+    await pool.query("DELETE FROM users WHERE id = $1", [req.user.id]);
+
+    res.json({ success: true, message: "Your account and all associated data have been permanently deleted." });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+}
+
+module.exports = { registerUser, loginUser, getProfile, requestOtp, verifyOtp , requestPasswordReset, resetPassword, deleteOwnAccount };

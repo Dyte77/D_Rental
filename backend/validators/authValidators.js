@@ -42,6 +42,10 @@ const resetPasswordSchema = Joi.object({
   new_password: Joi.string().min(8).required().messages({ "string.min": "New password must be at least 8 characters." }),
 });
 
+const deleteAccountSchema = Joi.object({
+  password: Joi.string().required(),
+});
+
 module.exports = {
   registerSchema,
   loginSchema,
@@ -49,4 +53,5 @@ module.exports = {
   verifyOtpSchema,
   forgotPasswordSchema,
   resetPasswordSchema,
+  deleteAccountSchema
 };
