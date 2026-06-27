@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const { registerUser, loginUser, getProfile, requestOtp, verifyOtp, requestPasswordReset, resetPassword, deleteOwnAccount } = require("../controllers/authController");
+const { registerUser, loginUser, getProfile, requestOtp, verifyOtp, requestPasswordReset, resetPassword, deleteOwnAccount, getMyData, downloadMyData, downloadMyDataPdf } = require("../controllers/authController");
 const { verifyToken } = require("../middleware/authMiddleware");
 const { authLimiter } = require("../middleware/rateLimiter");
 const validate = require("../middleware/validate");
@@ -22,5 +22,8 @@ router.post("/verify-otp", authLimiter, validate(verifyOtpSchema), verifyOtp);
 router.post("/forgot-password", authLimiter, validate(forgotPasswordSchema), requestPasswordReset);
 router.post("/reset-password", authLimiter, validate(resetPasswordSchema), resetPassword);
 router.delete("/account", verifyToken, validate(deleteAccountSchema), deleteOwnAccount);
+router.get("/my-data", verifyToken, getMyData);
+router.get("/my-data/download", verifyToken, downloadMyData);
+router.get("/my-data/download-pdf", verifyToken, downloadMyDataPdf);
 
 module.exports = router;

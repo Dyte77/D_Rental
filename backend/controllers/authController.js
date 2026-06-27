@@ -1,4 +1,5 @@
 const bcrypt = require("bcrypt");
+const PDFDocument = require("pdfkit");
 const jwt = require("jsonwebtoken");
 const pool = require("../db");
 
@@ -274,4 +275,136 @@ async function deleteOwnAccount(req, res) {
   }
 }
 
-module.exports = { registerUser, loginUser, getProfile, requestOtp, verifyOtp , requestPasswordReset, resetPassword, deleteOwnAccount };
+async function getMyData(req, res) {
+  try {
+    const userResult = await pool.query(
+      "SELECT id, full_name, email, phone, role, is_verified, created_at FROM users WHERE id = $1",
+      [req.user.id]
+    );
+
+    const listingsResult = await pool.query("SELECT * FROM listings WHERE landlord_id = $1", [req.user.id]);
+
+    const sentMessagesResult = await pool.query("SELECT * FROM messages WHERE sender_id = $1", [req.user.id]);
+    const receivedMessagesResult = await pool.query("SELECT * FROM messages WHERE receiver_id = $1", [req.user.id]);
+
+    const savedListingsResult = await pool.query(
+      "SELECT listing_id, saved_at FROM saved_listings WHERE user_id = $1",
+      [req.user.id]
+    );
+
+    const reportsResult = await pool.query("SELECT * FROM reports WHERE reported_by = $1", [req.user.id]);
+
+    res.json({
+      success: true,
+      data: {
+        profile: userResult.rows[0],
+        listings: listingsResult.rows,
+        messagesSent: sentMessagesResult.rows,
+        messagesReceived: receivedMessagesResult.rows,
+        savedListings: savedListingsResult.rows,
+        reportsFiled: reportsResult.rows,
+      },
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+}
+
+async function downloadMyData(req, res) {
+  try {
+    const userResult = await pool.query(
+      "SELECT id, full_name, email, phone, role, is_verified, created_at FROM users WHERE id = $1",
+      [req.user.id]
+    );
+
+    const listingsResult = await pool.query("SELECT * FROM listings WHERE landlord_id = $1", [req.user.id]);
+    const sentMessagesResult = await pool.query("SELECT * FROM messages WHERE sender_id = $1", [req.user.id]);
+    const receivedMessagesResult = await pool.query("SELECT * FROM messages WHERE receiver_id = $1", [req.user.id]);
+    const savedListingsResult = await pool.query(
+      "SELECT listing_id, saved_at FROM saved_listings WHERE user_id = $1",
+      [req.user.id]
+    );
+    const reportsResult = await pool.query("SELECT * FROM reports WHERE reported_by = $1", [req.user.id]);
+
+    const exportData = {
+      profile: userResult.rows[0],
+      listings: listingsResult.rows,
+      messagesSent: sentMessagesResult.rows,
+      messagesReceived: receivedMessagesResult.rows,
+      savedListings: savedListingsResult.rows,
+      reportsFiled: reportsResult.rows,
+      exportedAt: new Date().toISOString(),
+    };
+
+    res.setHeader("Content-Type", "application/json");
+    res.setHeader("Content-Disposition", `attachment; filename="my-data-export.json"`);
+    res.send(JSON.stringify(exportData, null, 2));
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+}
+
+async function downloadMyDataPdf(req, res) {
+  try {
+    const userResult = await pool.query(
+      "SELECT id, full_name, email, phone, role, is_verified, created_at FROM users WHERE id = $1",
+      [req.user.id]
+    );
+
+    const listingsResult = await pool.query("SELECT * FROM listings WHERE landlord_id = $1", [req.user.id]);
+    const sentMessagesResult = await pool.query("SELECT * FROM messages WHERE sender_id = $1", [req.user.id]);
+    const receivedMessagesResult = await pool.query("SELECT * FROM messages WHERE receiver_id = $1", [req.user.id]);
+    const savedListingsResult = await pool.query(
+      "SELECT listing_id, saved_at FROM saved_listings WHERE user_id = $1",
+      [req.user.id]
+    );
+    const reportsResult = await pool.query("SELECT * FROM reports WHERE reported_by = $1", [req.user.id]);
+
+    const user = userResult.rows[0];
+    const doc = new PDFDocument({ margin: 50 });
+
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="my-data-export.pdf"`);
+    doc.pipe(res);
+
+    doc.fontSize(18).text("My Rental Connect Data Export", { underline: true });
+    doc.moveDown();
+
+    doc.fontSize(14).text("Profile", { underline: true });
+    doc.fontSize(11).text(`Name: ${user.full_name}`);
+    doc.text(`Email: ${user.email}`);
+    doc.text(`Phone: ${user.phone}`);
+    doc.text(`Role: ${user.role}`);
+    doc.text(`Verified: ${user.is_verified ? "Yes" : "No"}`);
+    doc.text(`Account created: ${new Date(user.created_at).toLocaleDateString()}`);
+    doc.moveDown();
+
+    doc.fontSize(14).text(`Listings (${listingsResult.rows.length})`, { underline: true });
+    if (listingsResult.rows.length === 0) {
+      doc.fontSize(11).text("None.");
+    } else {
+      listingsResult.rows.forEach((listing) => {
+        doc.fontSize(11).text(`• ${listing.title} — UGX ${listing.price_per_month}/month, ${listing.district} (${listing.status})`);
+      });
+    }
+    doc.moveDown();
+
+    doc.fontSize(14).text(`Messages sent (${sentMessagesResult.rows.length})`, { underline: true });
+    doc.fontSize(14).text(`Messages received (${receivedMessagesResult.rows.length})`, { underline: true });
+    doc.moveDown();
+
+    doc.fontSize(14).text(`Saved listings (${savedListingsResult.rows.length})`, { underline: true });
+    doc.moveDown();
+
+    doc.fontSize(14).text(`Reports filed (${reportsResult.rows.length})`, { underline: true });
+
+    doc.moveDown();
+    doc.fontSize(9).text(`Exported on ${new Date().toLocaleDateString()}`, { align: "center" });
+
+    doc.end();
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+}
+
+module.exports = { registerUser, loginUser, getProfile, requestOtp, verifyOtp , requestPasswordReset, resetPassword, deleteOwnAccount, getMyData, downloadMyData, downloadMyDataPdf };

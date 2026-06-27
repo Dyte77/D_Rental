@@ -7,6 +7,7 @@ const messageRoutes = require("./routes/messageRoutes");
 const reportRoutes = require("./routes/reportRoutes");
 const adminRoutes = require("./routes/adminRoutes");
 const { generalLimiter } = require("./middleware/rateLimiter");
+const savedListingRoutes = require("./routes/savedListingRoutes");
 
 const app = express();
 
@@ -18,6 +19,7 @@ app.use("/api/listings", listingRoutes);
 app.use("/api/messages", messageRoutes);
 app.use("/api/reports", reportRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api/saved-listings", savedListingRoutes);
 
 app.get("/", (req, res) => {
   res.send("Rental Connect backend is running.");
