@@ -10,7 +10,9 @@ const registerSchema = Joi.object({
     .messages({ "string.pattern.base": "Phone number must be 9–15 digits and may include +, spaces, or dashes." }),
   password: Joi.string().min(8).required().messages({ "string.min": "Password must be at least 8 characters." }),
   role: Joi.string().valid("tenant", "landlord").required(),
+  referral_code: Joi.string().trim().uppercase().optional().allow(""),
 });
+
 
 const loginSchema = Joi.object({
   email: Joi.string().trim().email().lowercase().required(),

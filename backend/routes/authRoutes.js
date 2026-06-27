@@ -1,6 +1,7 @@
 const express = require("express");
+const upload = require("../middleware/upload");
 const router = express.Router();
-const { registerUser, loginUser, getProfile, requestOtp, verifyOtp, requestPasswordReset, resetPassword, deleteOwnAccount, getMyData, downloadMyData, downloadMyDataPdf } = require("../controllers/authController");
+const { registerUser, loginUser, getProfile, requestOtp, verifyOtp, requestPasswordReset, resetPassword, deleteOwnAccount, getMyData, downloadMyData, downloadMyDataPdf,uploadProfilePicture ,getMyReferrals} = require("../controllers/authController");
 const { verifyToken } = require("../middleware/authMiddleware");
 const { authLimiter } = require("../middleware/rateLimiter");
 const validate = require("../middleware/validate");
@@ -25,5 +26,7 @@ router.delete("/account", verifyToken, validate(deleteAccountSchema), deleteOwnA
 router.get("/my-data", verifyToken, getMyData);
 router.get("/my-data/download", verifyToken, downloadMyData);
 router.get("/my-data/download-pdf", verifyToken, downloadMyDataPdf);
+router.post("/profile-picture", verifyToken, upload.single("profile_picture"), uploadProfilePicture);
+router.get("/my-referrals", verifyToken, getMyReferrals);
 
 module.exports = router;

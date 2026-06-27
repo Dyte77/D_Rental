@@ -1,0 +1,2 @@
+ALTER TABLE listings
+ADD COLUMN share_count INTEGER DEFAULT 0;

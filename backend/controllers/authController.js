@@ -2,18 +2,34 @@ const bcrypt = require("bcrypt");
 const PDFDocument = require("pdfkit");
 const jwt = require("jsonwebtoken");
 const pool = require("../db");
+const cloudinary = require("../config/cloudinary");
 
 async function registerUser(req, res) {
   try {
-    const { full_name, email, phone, password, role } = req.body;
+    const { full_name, email, phone, password, role, referral_code } = req.body;
+
+    if (!["tenant", "landlord"].includes(role)) {
+      return res.status(400).json({ success: false, error: "Role must be either 'tenant' or 'landlord'." });
+    }
 
     const passwordHash = await bcrypt.hash(password, 10);
 
+    let referredByUserId = null;
+
+    if (referral_code) {
+      const referrerResult = await pool.query("SELECT id FROM users WHERE referral_code = $1", [referral_code]);
+      if (referrerResult.rows.length > 0) {
+        referredByUserId = referrerResult.rows[0].id;
+      }
+    }
+
+    const myReferralCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+
     const result = await pool.query(
-      `INSERT INTO users (full_name, email, phone, password_hash, role)
-       VALUES ($1, $2, $3, $4, $5)
-       RETURNING id, full_name, email, phone, role, is_verified, created_at`,
-      [full_name, email, phone, passwordHash, role]
+      `INSERT INTO users (full_name, email, phone, password_hash, role, referral_code, referred_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       RETURNING id, full_name, email, phone, role, is_verified, referral_code, created_at`,
+      [full_name, email, phone, passwordHash, role, myReferralCode, referredByUserId]
     );
 
     res.status(201).json({ success: true, user: result.rows[0] });
@@ -83,7 +99,7 @@ async function loginUser(req, res) {
 async function getProfile(req, res) {
   try {
     const result = await pool.query(
-     "SELECT id, full_name, email, phone, role, is_verified, created_at FROM users WHERE id = $1",
+     "SELECT id, full_name, email, phone, role, is_verified, profile_picture_url, created_at FROM users WHERE id = $1",
       [req.user.id]
     );
 
@@ -407,4 +423,47 @@ async function downloadMyDataPdf(req, res) {
   }
 }
 
-module.exports = { registerUser, loginUser, getProfile, requestOtp, verifyOtp , requestPasswordReset, resetPassword, deleteOwnAccount, getMyData, downloadMyData, downloadMyDataPdf };
+async function uploadProfilePicture(req, res) {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, error: "No image file provided." });
+    }
+
+    const base64Image = `data:${req.file.mimetype};base64,${req.file.buffer.toString("base64")}`;
+
+    const uploadResult = await cloudinary.uploader.upload(base64Image, {
+      folder: "rental_connect_profile_pictures",
+    });
+
+    const result = await pool.query(
+      "UPDATE users SET profile_picture_url = $1 WHERE id = $2 RETURNING id, full_name, profile_picture_url",
+      [uploadResult.secure_url, req.user.id]
+    );
+
+    res.json({ success: true, user: result.rows[0] });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+}
+
+async function getMyReferrals(req, res) {
+  try {
+    const userResult = await pool.query("SELECT referral_code FROM users WHERE id = $1", [req.user.id]);
+
+    const referredUsersResult = await pool.query(
+      "SELECT id, full_name, role, created_at FROM users WHERE referred_by = $1",
+      [req.user.id]
+    );
+
+    res.json({
+      success: true,
+      referralCode: userResult.rows[0].referral_code,
+      totalReferred: referredUsersResult.rows.length,
+      referredUsers: referredUsersResult.rows,
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+}
+
+module.exports = { registerUser, loginUser, getProfile, requestOtp, verifyOtp , requestPasswordReset, resetPassword, deleteOwnAccount, getMyData, downloadMyData, downloadMyDataPdf, uploadProfilePicture , getMyReferrals };

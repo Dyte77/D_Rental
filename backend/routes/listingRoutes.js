@@ -13,6 +13,7 @@ const {
   uploadListingImage,
   deleteListingImage,
   downloadListingPdf,
+  shareListing
 } = require("../controllers/listingController");
 
 router.post("/", verifyToken, validate(createListingSchema), createListing);
@@ -23,5 +24,6 @@ router.delete("/:id", verifyToken, deleteListing);
 router.post("/:id/images", verifyToken, upload.array("images", 5), uploadListingImage);
 router.delete("/images/:imageId", verifyToken, deleteListingImage);
 router.get("/:id/download", verifyToken, downloadListingPdf);
+router.post("/:id/share", shareListing);
 
 module.exports = router;

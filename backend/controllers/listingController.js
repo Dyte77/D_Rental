@@ -368,4 +368,34 @@ async function downloadListingPdf(req, res) {
   }
 }
 
-module.exports = { createListing, getListings, getListingById, updateListing, deleteListing, adminDeleteListing, uploadListingImage, deleteListingImage, downloadListingPdf };
+async function shareListing(req, res) {
+  try {
+    const { id } = req.params;
+
+    const result = await pool.query(
+      "UPDATE listings SET share_count = share_count + 1 WHERE id = $1 RETURNING id, title, price_per_month, district, share_count",
+      [id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ success: false, error: "Listing not found." });
+    }
+
+    const listing = result.rows[0];
+
+    const shareText = `Check out this rental on Rental Connect: ${listing.title} — UGX ${listing.price_per_month}/month in ${listing.district}. View it here: https://rentalconnect.app/listings/${listing.id}`;
+
+    const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(shareText)}`;
+
+    res.json({
+      success: true,
+      shareText,
+      whatsappUrl,
+      shareCount: listing.share_count,
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+}
+
+module.exports = { createListing, getListings, getListingById, updateListing, deleteListing, adminDeleteListing, uploadListingImage, deleteListingImage, downloadListingPdf, shareListing };
