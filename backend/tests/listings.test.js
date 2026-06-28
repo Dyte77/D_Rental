@@ -33,13 +33,13 @@ describe("Listing endpoints", () => {
       email: landlord.email,
       password: landlord.password,
     });
-    landlordToken = landlordLogin.body.token;
+    landlordToken = landlordLogin.body.accessToken;
 
     const tenantLogin = await request(app).post("/api/auth/login").send({
       email: tenant.email,
       password: tenant.password,
     });
-    tenantToken = tenantLogin.body.token;
+    tenantToken = tenantLogin.body.accessToken;
   });
 
   afterAll(async () => {

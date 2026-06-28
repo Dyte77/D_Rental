@@ -1,6 +1,11 @@
 const bcrypt = require("bcrypt");
 const PDFDocument = require("pdfkit");
 const jwt = require("jsonwebtoken");
+
+
+// Node's built-in crypto module — used to generate a secure random
+// string for the refresh token itself (not a JWT, just random bytes)
+const crypto = require("crypto");
 const pool = require("../db");
 const cloudinary = require("../config/cloudinary");
 
@@ -73,15 +78,36 @@ async function loginUser(req, res) {
     }
 
 
-    const token = jwt.sign(
+   // Access token: short-lived (15 minutes), used for every normal API request.
+    // Kept short on purpose — if one is ever stolen, it's only useful for a brief window.
+    const accessToken = jwt.sign(
       { id: user.id, role: user.role },
       process.env.JWT_SECRET,
-      { expiresIn: "7d" }
+      { expiresIn: "15m" }
+    );
+
+    // A fresh family_id marks the start of a brand new login session.
+    // Every refresh token generated from this login (through rotation)
+    // will share this same family_id, letting us revoke them all together
+    // if we ever detect token theft.
+    // Built into Node's crypto module — no extra package needed, and avoids
+    // a CommonJS/ESM compatibility issue that uuid's package caused with Jest.
+    const familyId = crypto.randomUUID();
+
+    // Refresh token: a long, random string (not a JWT) used only to request
+    // a new access token later. Stored in the database so we can revoke it.
+    const refreshTokenValue = crypto.randomBytes(64).toString("hex");
+    const refreshTokenExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days from now
+
+    await pool.query(
+      "INSERT INTO refresh_tokens (user_id, token, family_id, expires_at) VALUES ($1, $2, $3, $4)",
+      [user.id, refreshTokenValue, familyId, refreshTokenExpiresAt]
     );
 
     res.json({
       success: true,
-      token,
+      accessToken,
+      refreshToken: refreshTokenValue,
       user: {
         id: user.id,
         full_name: user.full_name,
@@ -95,6 +121,96 @@ async function loginUser(req, res) {
   }
 }
 
+// REFRESH ENDPOINT
+// Takes a valid refresh token and issues a brand new access token +
+// a brand new refresh token (rotation). The old refresh token is
+// immediately marked as revoked, so it can never be used again.
+async function refreshAccessToken(req, res) {
+  try {
+    const { refreshToken } = req.body;
+
+    if (!refreshToken) {
+      return res.status(400).json({ success: false, error: "Refresh token is required." });
+    }
+
+    // Look up the refresh token in the database — this is what makes
+    // refresh tokens revocable, unlike stateless JWTs.
+    const tokenResult = await pool.query(
+      "SELECT * FROM refresh_tokens WHERE token = $1",
+      [refreshToken]
+    );
+
+    // If the token doesn't exist at all, it was never issued by us — reject outright.
+    if (tokenResult.rows.length === 0) {
+      return res.status(401).json({ success: false, error: "Invalid refresh token." });
+    }
+
+    const storedToken = tokenResult.rows[0];
+
+    // THEFT DETECTION: if this token has already been revoked, it means
+    // someone is trying to reuse a refresh token that was already rotated
+    // away. This is a strong signal the token was stolen and used by an
+    // attacker (or the original device) after the legitimate rotation
+    // already happened. We respond by revoking the ENTIRE token family —
+    // logging out every session descended from that original login.
+    if (storedToken.is_revoked) {
+      await pool.query(
+        "UPDATE refresh_tokens SET is_revoked = TRUE WHERE family_id = $1",
+        [storedToken.family_id]
+      );
+      return res.status(401).json({
+        success: false,
+        error: "Refresh token reuse detected. All sessions for this login have been revoked. Please log in again.",
+      });
+    }
+
+    // If the token has simply expired naturally (not stolen, just old), reject it normally.
+    if (new Date() > new Date(storedToken.expires_at)) {
+      return res.status(401).json({ success: false, error: "Refresh token has expired. Please log in again." });
+    }
+
+    // Confirm the user this token belongs to still exists and isn't suspended —
+    // same live check we already do for access tokens.
+    const userResult = await pool.query("SELECT * FROM users WHERE id = $1", [storedToken.user_id]);
+
+    if (userResult.rows.length === 0) {
+      return res.status(401).json({ success: false, error: "User no longer exists." });
+    }
+
+    const user = userResult.rows[0];
+
+    if (user.is_suspended) {
+      return res.status(403).json({ success: false, error: "Your account has been suspended." });
+    }
+
+    // ROTATION: mark the old refresh token as revoked immediately,
+    // then issue a brand new one in the same family.
+    await pool.query("UPDATE refresh_tokens SET is_revoked = TRUE WHERE id = $1", [storedToken.id]);
+
+    const newRefreshTokenValue = crypto.randomBytes(64).toString("hex");
+    const newRefreshTokenExpiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+
+    await pool.query(
+      "INSERT INTO refresh_tokens (user_id, token, family_id, expires_at) VALUES ($1, $2, $3, $4)",
+      [user.id, newRefreshTokenValue, storedToken.family_id, newRefreshTokenExpiresAt]
+    );
+
+    // Issue a brand new short-lived access token too.
+    const newAccessToken = jwt.sign(
+      { id: user.id, role: user.role },
+      process.env.JWT_SECRET,
+      { expiresIn: "15m" }
+    );
+
+    res.json({
+      success: true,
+      accessToken: newAccessToken,
+      refreshToken: newRefreshTokenValue,
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+}
 
 async function getProfile(req, res) {
   try {
@@ -466,4 +582,28 @@ async function getMyReferrals(req, res) {
   }
 }
 
-module.exports = { registerUser, loginUser, getProfile, requestOtp, verifyOtp , requestPasswordReset, resetPassword, deleteOwnAccount, getMyData, downloadMyData, downloadMyDataPdf, uploadProfilePicture , getMyReferrals };
+// LOGOUT
+// Revokes the refresh token the client sends, so it can never be used
+// again to get new access tokens. The current access token will still
+// technically work until it naturally expires (max 15 minutes), but no
+// new ones can be issued from this session afterward.
+async function logoutUser(req, res) {
+  try {
+    const { refreshToken } = req.body;
+
+    if (!refreshToken) {
+      return res.status(400).json({ success: false, error: "Refresh token is required." });
+    }
+
+    await pool.query(
+      "UPDATE refresh_tokens SET is_revoked = TRUE WHERE token = $1",
+      [refreshToken]
+    );
+
+    res.json({ success: true, message: "Logged out successfully." });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+}
+
+module.exports = { registerUser, refreshAccessToken,loginUser, logoutUser, getProfile, requestOtp, verifyOtp , requestPasswordReset, resetPassword, deleteOwnAccount, getMyData, downloadMyData, downloadMyDataPdf, uploadProfilePicture , getMyReferrals };

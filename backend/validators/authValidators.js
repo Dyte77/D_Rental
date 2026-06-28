@@ -48,6 +48,12 @@ const deleteAccountSchema = Joi.object({
   password: Joi.string().required(),
 });
 
+// Used by both the refresh and logout endpoints — both just need
+// a refresh token string in the request body.
+const refreshTokenSchema = Joi.object({
+  refreshToken: Joi.string().required(),
+});
+
 module.exports = {
   registerSchema,
   loginSchema,
@@ -55,5 +61,6 @@ module.exports = {
   verifyOtpSchema,
   forgotPasswordSchema,
   resetPasswordSchema,
-  deleteAccountSchema
+  deleteAccountSchema,
+  refreshTokenSchema
 };

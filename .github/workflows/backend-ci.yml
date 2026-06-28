@@ -53,6 +53,11 @@ jobs:
           psql -h localhost -U postgres -d d_rental_test -f db/006_add_suspension_to_users.sql
           psql -h localhost -U postgres -d d_rental_test -f db/007_create_listing_images.sql
           psql -h localhost -U postgres -d d_rental_test -f db/008_add_listing_indexes.sql
+          psql -h localhost -U postgres -d d_rental_test -f db/009_create_saved_listings.sql
+          psql -h localhost -U postgres -d d_rental_test -f db/010_add_profile_picture_to_users.sql
+          psql -h localhost -U postgres -d d_rental_test -f db/011_add_share_count_to_listings.sql
+          psql -h localhost -U postgres -d d_rental_test -f db/012_add_referrals.sql
+          psql -h localhost -U postgres -d d_rental_test -f db/013_create_refresh_tokens.sql
 
       - name: Run tests
         working-directory: backend

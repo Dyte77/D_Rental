@@ -1,8 +1,15 @@
 const rateLimit = require("express-rate-limit");
 
+// In test mode, our own automated test suite makes many rapid requests
+// to the same auth endpoints — far more than any real user would in
+// normal use. We raise the limit dramatically during tests so the
+// rate limiter doesn't interfere with legitimate automated testing,
+// while keeping the real, strict limit active in development and production.
+const isTestEnv = process.env.NODE_ENV === "test";
+
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 10, // limit each IP to 10 requests per window for sensitive auth actions
+  max: isTestEnv ? 1000 : 10, // effectively unlimited during tests, strict otherwise
   message: { success: false, error: "Too many attempts. Please try again later." },
   standardHeaders: true,
   legacyHeaders: false,
@@ -10,7 +17,7 @@ const authLimiter = rateLimit({
 
 const generalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 200, // more generous limit for general API usage
+  max: isTestEnv ? 1000 : 200,
   message: { success: false, error: "Too many requests. Please slow down." },
   standardHeaders: true,
   legacyHeaders: false,

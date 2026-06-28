@@ -53,7 +53,8 @@ describe("Auth endpoints", () => {
 
     expect(res.statusCode).toBe(200);
     expect(res.body.success).toBe(true);
-    expect(res.body.token).toBeDefined();
+    expect(res.body.accessToken).toBeDefined();
+    expect(res.body.refreshToken).toBeDefined();
   });
 
   test("rejects login with wrong password", async () => {
@@ -71,7 +72,7 @@ describe("Auth endpoints", () => {
     email: testUser.email,
     password: testUser.password,
   });
-  const token = loginRes.body.token;
+  const token = loginRes.body.accessToken;
 
   const res = await request(app)
     .delete("/api/auth/account")
@@ -86,7 +87,7 @@ test("deletes own account with correct password, and token becomes invalid after
     email: testUser.email,
     password: testUser.password,
   });
-  const token = loginRes.body.token;
+  const token = loginRes.body.accessToken;
 
   const deleteRes = await request(app)
     .delete("/api/auth/account")
