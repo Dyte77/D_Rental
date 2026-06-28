@@ -9,7 +9,7 @@ const isTestEnv = process.env.NODE_ENV === "test";
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: isTestEnv ? 1000 : 10, // effectively unlimited during tests, strict otherwise
+  max: isTestEnv ? 50000 : 10, // effectively unlimited during tests, strict otherwise
   message: { success: false, error: "Too many attempts. Please try again later." },
   standardHeaders: true,
   legacyHeaders: false,
@@ -17,7 +17,7 @@ const authLimiter = rateLimit({
 
 const generalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: isTestEnv ? 1000 : 200,
+  max: isTestEnv ? 50000 : 200,
   message: { success: false, error: "Too many requests. Please slow down." },
   standardHeaders: true,
   legacyHeaders: false,

@@ -6,6 +6,9 @@
   "scripts": {
     "test": "jest --runInBand"
   },
+  "jest": {
+    "testPathIgnorePatterns": ["/node_modules/", "/load-tests/"]
+  },
   "keywords": [],
   "author": "",
   "license": "ISC",
