@@ -1,5 +1,6 @@
 const express = require("express");
 const cors = require("cors");
+const helmet = require("helmet");
 const allowedOrigins = []; // add real frontend domains here once they exist
 
 const corsOptions = {
@@ -24,6 +25,7 @@ const savedListingRoutes = require("./routes/savedListingRoutes");
 
 const app = express();
 
+app.use(helmet());
 app.use(cors(corsOptions));
 app.use(express.json());
 app.use(generalLimiter);
