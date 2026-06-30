@@ -1,4 +1,5 @@
 import 'dart:convert';
+import '../models/listing.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
@@ -82,4 +83,22 @@ class ApiService {
 
     return data;
   }
+
+  /// Fetches the public list of available listings. This endpoint
+  /// doesn't require authentication — same as the backend route,
+  /// which is intentionally public so tenants can browse freely.
+  Future<List<Listing>> getListings() async {
+    final response = await http.get(Uri.parse("$baseUrl/listings"));
+
+    final data = jsonDecode(response.body);
+
+    if (data["success"] == true) {
+      final List<dynamic> rawListings = data["listings"];
+      return rawListings.map((json) => Listing.fromJson(json)).toList();
+    } else {
+      throw Exception(data["error"] ?? "Failed to load listings.");
+    }
+  }
+
+  
 }
