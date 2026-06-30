@@ -100,5 +100,27 @@ class ApiService {
     }
   }
 
+  /// Fetches full detail for a single listing. The backend returns
+  /// different data depending on whether a valid token is sent — full
+  /// details if logged in, a locked/limited view if not. We pass the
+  /// access token here (if one exists) so logged-in users automatically
+  /// see the full picture.
+  Future<Listing> getListingDetail(int id) async {
+    final token = await getAccessToken();
+
+    final response = await http.get(
+      Uri.parse("$baseUrl/listings/$id"),
+      headers: token != null ? {"Authorization": "Bearer $token"} : {},
+    );
+
+    final data = jsonDecode(response.body);
+
+    if (data["success"] == true) {
+      return Listing.fromJson(data["listing"]);
+    } else {
+      throw Exception(data["error"] ?? "Failed to load listing.");
+    }
+  }
+
   
 }

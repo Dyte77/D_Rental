@@ -10,8 +10,10 @@ class Listing {
   final String priceePerMonth;
   final String? district;
   final String? roomType;
+  final String? description;
   final String status;
   final bool locked;
+  final String? lockedMessage;
   final List<String> imageUrls;
 
   Listing({
@@ -20,15 +22,14 @@ class Listing {
     required this.priceePerMonth,
     this.district,
     this.roomType,
+    this.description,
     required this.status,
     required this.locked,
+    this.lockedMessage,
     required this.imageUrls,
   });
 
   factory Listing.fromJson(Map<String, dynamic> json) {
-    // The "images" field is a list of objects like {id, image_url, ...}
-    // — we only need the URL itself for displaying photos, so we map
-    // over the raw list and extract just that one field from each.
     final List<dynamic> rawImages = json["images"] ?? [];
     final List<String> urls = rawImages
         .map((image) => image["image_url"] as String)
@@ -40,8 +41,10 @@ class Listing {
       priceePerMonth: json["price_per_month"].toString(),
       district: json["district"],
       roomType: json["room_type"],
+      description: json["description"],
       status: json["status"] ?? "available",
       locked: json["locked"] ?? false,
+      lockedMessage: json["message"],
       imageUrls: urls,
     );
   }

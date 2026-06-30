@@ -29,7 +29,20 @@ class _ListingsScreenState extends State<ListingsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Browse Listings")),
+      appBar: AppBar(
+        title: const Text("Browse Listings"),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pushNamed(context, "/login");
+            },
+            child: const Text(
+              "Log In",
+              style: TextStyle(color: Colors.white),
+            ),
+          ),
+        ],
+      ),
       body: FutureBuilder<List<Listing>>(
         future: _listingsFuture,
         builder: (context, snapshot) {
@@ -57,6 +70,13 @@ class _ListingsScreenState extends State<ListingsScreen> {
               return Card(
                 margin: const EdgeInsets.all(8),
                 child: ListTile(
+                  onTap: () {
+                    Navigator.pushNamed(
+                      context,
+                      "/listing-detail",
+                      arguments: listing.id,
+                    );
+                  },
                   leading: listing.imageUrls.isNotEmpty
                       ? Image.network(
                           listing.imageUrls.first,

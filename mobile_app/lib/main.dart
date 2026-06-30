@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'screens/register_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/listings_screen.dart';
+import 'screens/listing_detail_screen.dart';
 
 void main() {
   runApp(const MyApp());
@@ -14,17 +15,24 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Rental Connect',
-      // initialRoute decides what screen shows first when the app
-      // opens. For now we start at login; later this will likely be
-      // a splash screen that checks for an existing valid session.
-      initialRoute: "/login",
-      // routes maps a String path to the Widget that should display
-      // for it — this is what Navigator.pushNamed/pushReplacementNamed
-      // actually look up when called from our screens.
+      initialRoute: "/listings",
       routes: {
         "/login": (context) => const LoginScreen(),
         "/register": (context) => const RegisterScreen(),
         "/listings": (context) => const ListingsScreen(),
+      },
+      // onGenerateRoute handles routes that need to receive arguments,
+      // like which specific listing to show — the simple `routes` map
+      // above only supports routes with no dynamic data attached.
+      onGenerateRoute: (settings) {
+        if (settings.name == "/listing-detail") {
+          final listingId = settings.arguments as int;
+          return MaterialPageRoute(
+            builder: (context) =>
+                ListingDetailScreen(listingId: listingId),
+          );
+        }
+        return null;
       },
     );
   }
