@@ -84,7 +84,34 @@ async function getListings(req, res) {
 
     const result = await pool.query(query, values);
 
-    res.json({ success: true, count: result.rows.length, listings: result.rows });
+    // Fetch images for ALL matching listings in a single query, rather
+    // than one extra query per listing (which would be slow and
+    // wasteful for a list of, say, 50 listings). We then group them
+    // by listing_id in JavaScript afterward.
+    const listingIds = result.rows.map((listing) => listing.id);
+
+    let imagesByListingId = {};
+
+    if (listingIds.length > 0) {
+      const imagesResult = await pool.query(
+        "SELECT listing_id, image_url FROM listing_images WHERE listing_id = ANY($1) AND is_approved = TRUE",
+        [listingIds]
+      );
+
+      imagesResult.rows.forEach((row) => {
+        if (!imagesByListingId[row.listing_id]) {
+          imagesByListingId[row.listing_id] = [];
+        }
+        imagesByListingId[row.listing_id].push({ image_url: row.image_url });
+      });
+    }
+
+    const listingsWithImages = result.rows.map((listing) => ({
+      ...listing,
+      images: imagesByListingId[listing.id] || [],
+    }));
+
+    res.json({ success: true, count: listingsWithImages.length, listings: listingsWithImages });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
