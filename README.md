@@ -22,3 +22,4 @@ by giving tenants direct, verified access to real listings.
 - **Database:** PostgreSQL
 - **Auth:** JWT + OTP phone verification
 - **Storage:** Cloud object storage for listing images
+<!-- deployment test comment -->
